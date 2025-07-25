@@ -1,13 +1,10 @@
-
-from telegram import Update, ReplyKeyboardMarkup
+import asyncio
+from flask import Flask, request
+from telegram import Update, ReplyKeyboardMarkup, Bot
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
-    filters, ContextTypes, ConversationHandler
+    filters, ContextTypes
 )
-import asyncio
-from flask import Flask
-import threading
-import random
 
 MASTER_CHAT_ID = 5225197085
 TOKEN = "7436013012:AAGDYHV2P8mDuruQIBQCRCqmxC-864bZr3Q"
@@ -31,14 +28,9 @@ TEA_QUOTES = [
     "🍵 «Тот, кто чувствует чай, не нуждается в словах.»"
 ]
 
-NAME, DATE, PLACE, COMMENTS, PHONE, REMIND = range(6)
-
 app = Flask(__name__)
-@app.route('/')
-def home():
-    return "Bot is running"
-def run_flask():
-    app.run(host="0.0.0.0", port=8080)
+bot = Bot(token=TOKEN)
+application = ApplicationBuilder().token(TOKEN).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -58,13 +50,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Я не понял 🤔 Нажми кнопку ниже")
 
-def main():
-    threading.Thread(target=run_flask).start()
-    app_ = ApplicationBuilder().token(TOKEN).build()
-    app_.add_handler(CommandHandler("start", start))
-    app_.add_handler(MessageHandler(filters.COMMAND, unknown))
-    app_.add_handler(MessageHandler(filters.TEXT, unknown))
-    app_.run_polling()
+application.add_handler(CommandHandler("start", start))
+application.add_handler(MessageHandler(filters.COMMAND, unknown))
+application.add_handler(MessageHandler(filters.TEXT, unknown))
+
+@app.route('/')
+def home():
+    return "Bot is running"
+
+@app.post(f"/{TOKEN}")
+def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    asyncio.create_task(application.process_update(update))
+    return "ok"
 
 if __name__ == "__main__":
-    main()
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    bot.set_webhook(f"https://gvozdilistya.onrender.com/{TOKEN}")
+    app.run(host="0.0.0.0", port=port)
