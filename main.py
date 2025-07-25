@@ -1,21 +1,17 @@
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
-    ContextTypes, ConversationHandler, filters
+    filters, ContextTypes, ConversationHandler
 )
-import os
-import random
-from flask import Flask, request
 import asyncio
+from flask import Flask
+import threading
+import random
 
-# 🔧 Конфигурация
-TOKEN = "7436013012:AAGDYHV2P8mDuruQIBQCRCqmxC-864bZr3Q"
 MASTER_CHAT_ID = 5225197085
-BOT_USERNAME = "Gvozdi_i_Listya_Bot"
-WEBHOOK_PATH = f"/{TOKEN}"
-WEBHOOK_URL = f"https://gvozdilistya.onrender.com{WEBHOOK_PATH}"
+TOKEN = "7436013012:AAGDYHV2P8mDuruQIBQCRCqmxC-864bZr3Q"
 
-# 🍵 Цитаты
 TEA_QUOTES = [
     "🍵 «Пей чай, и всё само расставится по местам.»",
     "🍵 «Чай не решает проблемы, но делает их теплее.»",
@@ -26,29 +22,27 @@ TEA_QUOTES = [
     "🍵 «Жизнь не в суете. Жизнь в чае.»",
     "🍵 «Каждая церемония — возвращение домой.»",
     "🍵 «Тот, кто пьёт чай, уже не спешит.»",
-    "🍵 «Чайный пьяница — тот, кто трезво видит с закрытыми глазами.»"
+    "🍵 «Чайный пьяница — тот, кто трезво видит с закрытыми глазами.»",
+    "🍵 «Пей чай, пока мысли не растворятся, как осадок в глине.»",
+    "🍵 «Гвозди под ногами, чай в ладонях, и ты в себе.»",
+    "🍵 «Тишина – это тоже вкус, просто редкий.»",
+    "🍵 «Ушёл в пуэр — не ищите.»",
+    "🍵 «В этом мире больше вкусов, чем решений.»",
+    "🍵 «Тот, кто чувствует чай, не нуждается в словах.»"
 ]
 
-# Состояния
-NAME, DATE, PLACE, COMMENTS, PHONE, REMIND, NOTE = range(7)
+NAME, DATE, PLACE, COMMENTS, PHONE, REMIND = range(6)
 
-# Flask
-flask_app = Flask(__name__)
-telegram_app = ApplicationBuilder().token(TOKEN).build()
-
-# Flask роут
-@flask_app.post(WEBHOOK_PATH)
-async def webhook():
-    await telegram_app.update_queue.put(Update.de_json(request.get_json(force=True), telegram_app.bot))
-    return "OK", 200
-
-@flask_app.get("/")
+app = Flask(__name__)
+@app.route('/')
 def home():
-    return "Бот запущен!"
+    return "Bot is running"
+def run_flask():
+    app.run(host="0.0.0.0", port=8080)
 
-# Старт
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(MASTER_CHAT_ID, f"👋 @{update.effective_user.username or 'гость'} запустил бота.")
+    user = update.effective_user
+    await context.bot.send_message(chat_id=MASTER_CHAT_ID, text=f"👋 @{user.username or 'гость'} запустил бота.")
     keyboard = [
         ["🧘 О практике", "📅 Записаться"],
         ["🍵 Цитата дня от чайного пьяницы"],
@@ -56,23 +50,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ["🤝 Поддержать проект"]
     ]
     await update.message.reply_text(
-        "🛠️ Добро пожаловать в пространство *«Гвозди и Листья»* 🍃\n\n"
-        "👇 Выбери действие:",
+        "🛠️ Добро пожаловать в пространство *«Гвозди и Листья»* 🍃",
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
         parse_mode="Markdown"
     )
 
-# Остальной код не меняется (цитаты, записки, запись, напоминания и т.п.)
+async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Я не понял 🤔 Нажми кнопку ниже")
 
-# Добавим сюда конец
-def run():
-    telegram_app.add_handler(CommandHandler("start", start))
-    telegram_app.add_handler(MessageHandler(filters.Regex("🍵 Цитата дня от чайного пьяницы"), tea_quote))
-    telegram_app.add_handler(MessageHandler(filters.COMMAND, unknown))
-    telegram_app.add_handler(MessageHandler(filters.TEXT, unknown))
-
-    telegram_app.bot.set_webhook(url=WEBHOOK_URL)
-    flask_app.run(host="0.0.0.0", port=8080)
+def main():
+    threading.Thread(target=run_flask).start()
+    app_ = ApplicationBuilder().token(TOKEN).build()
+    app_.add_handler(CommandHandler("start", start))
+    app_.add_handler(MessageHandler(filters.COMMAND, unknown))
+    app_.add_handler(MessageHandler(filters.TEXT, unknown))
+    app_.run_polling()
 
 if __name__ == "__main__":
-    run()
+    main()
